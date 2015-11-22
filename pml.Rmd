@@ -1,0 +1,108 @@
+---
+title: "Prediction of exercise doing manner"
+author: Sergey Lebedev
+date: November 22, 2015
+output: html_document
+---
+
+# Reading files
+```{r}
+require(caret)
+require(data.table)
+training <- fread('../data/pml-training.csv')
+testing <- fread('../data/pml-testing.csv')
+```
+
+# Cleaning data and removing NA columns
+```{r}
+feature.names <- unique(c(names(testing), names(training))) 
+for (name in feature.names[which(feature.names != 'classe')]){
+    if (sum(!is.na(training[[name]])) == 0 | sum(!is.na(testing[[name]])) == 0){
+        cat('Column', name, 'removed\n')
+        training[[name]] <- NULL
+        testing[[name]] <- NULL
+    }
+}
+feature.names <- names(testing)
+```
+
+# Removing empty data
+```{r}
+for (name in feature.names){
+    tn <- table(training[[name]], useNA='ifany')
+    tn <- tn/sum(tn)
+    if ('' %in% names(tn)){
+        if (tn[which(names(tn) == '')] > 0.9){
+            cat('Column', name, 'removed\n')
+            training[[name]] <- NULL
+            testing[[name]] <- NULL
+        }
+    }
+    if ('NA' %in% names(tn)){
+        if (tn[which(names(tn) == 'NA')] > 0.9){
+            cat('Column', name, 'removed\n')
+            training[[name]] <- NULL
+            testing[[name]] <- NULL
+        }
+    }
+}
+feature.names <- names(testing)
+```
+
+# Removing time values
+```{r}
+technical <- c('V1', 'raw_timestamp_part_1', 'raw_timestamp_part_2', 'cvtd_timestamp', 'new_window', 'num_window')
+for (name in technical){
+    cat('Column', name, 'removed\n')
+    training[[name]] <- NULL
+    testing[[name]] <- NULL
+}
+feature.names <- names(testing)
+```
+
+# Making model based on decison trees
+```{r}
+set.seed(2128506)
+modelFit <- train(classe ~., method='rpart', data=training, trControl=trainControl(method='cv', number=10))
+print(modelFit)
+```
+
+# Plotting decision tree
+```{r}
+library(rattle)
+library(rpart)
+fancyRpartPlot(modelFit$finalModel)
+```
+
+Unfortunately, that model have low accuracy and I rejected it.
+
+# Making model based on random forest
+```{r}
+set.seed(2128506)
+modelFit <- train(.outcome ~., method='rf', data=training, trControl=trainControl(method='cv', number=10))
+print(modelFit)
+```
+
+# Researching feature importance
+```{r}
+varImp(modelFit)
+```
+
+# Making predictions based on model
+```{r}
+pred <- predict(modelFit, testing)
+cat(pred)
+```
+
+# Saving submissions
+```{r}
+pml_write_files <- function(x){
+    n <- length(x)
+    for (i in 1:n){
+        filename <- paste0('problem_id_', i, '.txt')
+        write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+    }
+}
+
+pml_write_files(pred)
+```
