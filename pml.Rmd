@@ -67,7 +67,7 @@ modelFit <- train(classe ~., method='rpart', data=training, trControl=trainContr
 print(modelFit)
 ```
 
-# Plotting decision tree
+## Plotting decision tree
 ```{r}
 library(rattle)
 library(rpart)
